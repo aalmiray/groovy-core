@@ -61,7 +61,7 @@ public class GroovyRootDocBuilder {
         this.tool = tool;
         this.sourcepaths = sourcepaths;
         this.links = links;
-        this.rootDoc = new SimpleGroovyRootDoc("root");
+        this.rootDoc = new SimpleGroovyRootDoc("root", properties);
         this.properties = properties;
     }
 

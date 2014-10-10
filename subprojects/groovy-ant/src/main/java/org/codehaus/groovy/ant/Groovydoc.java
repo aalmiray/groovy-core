@@ -15,22 +15,29 @@
  */
 package org.codehaus.groovy.ant;
 
+import com.sun.javadoc.Doclet;
+import com.sun.javadoc.RootDoc;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.Task;
 import org.apache.tools.ant.types.DirSet;
 import org.apache.tools.ant.types.Path;
 import org.apache.tools.ant.types.PatternSet;
+import org.codehaus.groovy.groovydoc.GroovyDoc;
+import org.codehaus.groovy.groovydoc.GroovyRootDoc;
 import org.codehaus.groovy.runtime.ResourceGroovyMethods;
 import org.codehaus.groovy.tools.groovydoc.ClasspathResourceManager;
 import org.codehaus.groovy.tools.groovydoc.FileOutputTool;
 import org.codehaus.groovy.tools.groovydoc.GroovyDocTool;
 import org.codehaus.groovy.tools.groovydoc.LinkArgument;
+import org.codehaus.groovy.tools.groovydoc.adapters.java.JavaDocUtils;
 import org.codehaus.groovy.tools.groovydoc.gstringTemplates.GroovyDocTemplateInfo;
 
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 /**
@@ -68,6 +75,9 @@ public class Groovydoc extends Task {
 
     private String charset;
     private String fileEncoding;
+
+    private String doclet;
+    private String docletParams;
 
     public Groovydoc() {
         packageNames = new ArrayList<String>();
@@ -299,6 +309,25 @@ public class Groovydoc extends Task {
     }
 
     /**
+     * Specifies the class file that starts the doclet used in generating the documentation.
+     *
+     * @param doclet the class name of the Doclet to apply
+     */
+    public void setDoclet(String doclet) {
+        this.doclet = doclet;
+    }
+
+    /**
+     * Set an additional parameter(s) on the command line. This value should include quotes as necessary for
+     * parameters that include spaces.
+     *
+     * @param docletParams additional parameters sent to the configured doclet
+     */
+    public void setDocletParams(String docletParams) {
+        this.docletParams = docletParams;
+    }
+
+    /**
      * Add the directories matched by the nested dirsets to the resulting
      * packages list and the base directories of the dirsets to the Path.
      * It also handles the packages and excludepackages attributes and
@@ -442,6 +471,9 @@ public class Groovydoc extends Task {
         try {
             htmlTool.add(sourceFilesToDoc);
             FileOutputTool output = new FileOutputTool();
+            if (doclet != null) {
+                applyCustomDoclet(htmlTool);
+            }
             htmlTool.renderToOutput(output, destDir.getCanonicalPath()); // TODO push destDir through APIs?
         } catch (Exception e) {
             e.printStackTrace();
@@ -457,6 +489,49 @@ public class Groovydoc extends Task {
                         "'. Using default stylesheet instead. Due to: " + e.getMessage());
             }
         }
+    }
+
+    private void applyCustomDoclet(GroovyDocTool groovyDocTool) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
+        // load doclet class
+        Class<? extends Doclet> docletClass = (Class<? extends Doclet>) loadClass(doclet, Thread.currentThread().getContextClassLoader());
+
+        // instantiate doclet
+        GroovyRootDoc groovyRootDoc = groovyDocTool.getRootDoc();
+        RootDoc rootDoc = JavaDocUtils.toRootDoc(groovyRootDoc);
+        Doclet doc = instantiateDoclet(docletClass, rootDoc);
+
+        // invoke doclet
+        doc.start(rootDoc);
+    }
+
+    private Doclet instantiateDoclet(Class<? extends Doclet> docletClass, RootDoc rootDoc) throws IllegalAccessException, InstantiationException, InvocationTargetException {
+        try {
+            Constructor<? extends Doclet> constructor = docletClass.getDeclaredConstructor(RootDoc.class);
+            return constructor.newInstance(rootDoc);
+        } catch (NoSuchMethodException e) {
+            // try no args constructor
+            return docletClass.newInstance();
+        }
+    }
+
+    private Class<?> loadClass(String className, ClassLoader classLoader) throws ClassNotFoundException {
+        ClassNotFoundException cnfe;
+
+        ClassLoader cl = GroovyDoc.class.getClassLoader();
+        try {
+            return cl.loadClass(className);
+        } catch (ClassNotFoundException e) {
+            cnfe = e;
+        }
+
+        cl = classLoader;
+        try {
+            return cl.loadClass(className);
+        } catch (ClassNotFoundException e) {
+            cnfe = e;
+        }
+
+        throw cnfe;
     }
 
     private void checkScopeProperties(Properties properties) {
@@ -483,12 +558,12 @@ public class Groovydoc extends Task {
         links.add(result);
         return result;
     }
-    
+
     /**
      * Creates and returns an array of package template classpath entries.
      * <p>
      * This method is meant to be overridden by custom GroovyDoc implementations, using custom package templates.
-     * 
+     *
      * @return an array of package templates, whereas each entry is resolved as classpath entry, defaults to
      * {@link GroovyDocTemplateInfo#DEFAULT_PACKAGE_TEMPLATES}.
      */
@@ -500,7 +575,7 @@ public class Groovydoc extends Task {
      * Creates and returns an array of doc template classpath entries.
      * <p>
      * This method is meant to be overridden by custom GroovyDoc implementations, using custom doc templates.
-     * 
+     *
      * @return an array of doc templates, whereas each entry is resolved as classpath entry, defaults to
      * {@link GroovyDocTemplateInfo#DEFAULT_DOC_TEMPLATES}.
      */
@@ -512,7 +587,7 @@ public class Groovydoc extends Task {
      * Creates and returns an array of class template classpath entries.
      * <p>
      * This method is meant to be overridden by custom GroovyDoc implementations, using custom class templates.
-     * 
+     *
      * @return an array of class templates, whereas each entry is resolved as classpath entry, defaults to
      * {@link GroovyDocTemplateInfo#DEFAULT_CLASS_TEMPLATES}.
      */

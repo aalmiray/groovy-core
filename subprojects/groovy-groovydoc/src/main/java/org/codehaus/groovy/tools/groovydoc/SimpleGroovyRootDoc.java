@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDoc {
     private Map<String, GroovyPackageDoc> packageDocs;
@@ -31,11 +32,23 @@ public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDo
     private Map<String, GroovyClassDoc> classDocs;
     private List<GroovyClassDoc> classDocValues = null;
     private String description = "";
+    private final String[][] options;
 
     public SimpleGroovyRootDoc(String name) {
+        this(name, new Properties());
+    }
+
+    public SimpleGroovyRootDoc(String name, Properties properties) {
         super(name);
         packageDocs = new HashMap<String, GroovyPackageDoc>();
         classDocs = new HashMap<String, GroovyClassDoc>();
+
+        if (properties == null) properties = new Properties();
+        options = new String[properties.size()][];
+        int index = 0;
+        for (String key : properties.stringPropertyNames()) {
+            options[index++] = new String[]{key, properties.getProperty(key)};
+        }
     }
 
     public GroovyClassDoc classNamed(GroovyClassDoc groovyClassDoc, String name) {
@@ -85,8 +98,8 @@ public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDo
         return classDocValues.toArray(new GroovyClassDoc[classDocValues.size()]);
     }
 
-    public String[][] options() {/*todo*/
-        return null;
+    public String[][] options() {
+        return options;
     }
 
     public GroovyPackageDoc packageNamed(String packageName) {
@@ -103,8 +116,9 @@ public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDo
         packageDocValues = null;
     }
 
-    public GroovyClassDoc[] specifiedClasses() {/*todo*/
-        return null;
+    public GroovyClassDoc[] specifiedClasses() {
+        // TODO
+        return new GroovyClassDoc[0];
     }
 
     public GroovyPackageDoc[] specifiedPackages() {

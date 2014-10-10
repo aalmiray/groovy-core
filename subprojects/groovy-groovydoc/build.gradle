@@ -5,6 +5,7 @@ dependencies {
     testCompile project(':groovy-test')
     testCompile project(':groovy-ant')
     testCompile "org.apache.ant:ant-testutil:$antVersion"
+    compileOnly files(project.toolsLocation)
 }
 
 compileJava {

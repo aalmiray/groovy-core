@@ -24,11 +24,22 @@ buildscript {
 File javaHome = new File(System.getProperty('java.home'))
 logger.lifecycle "Using Java from $javaHome (version ${System.getProperty('java.version')})"
 
+ext.toolsLocation = new File("${System.properties['java.home']}/lib/tools.jar").absolutePath
+
+for (location in ['lib/tools.jar', '../lib/tools.jar']) {
+    javaHome = javaHome.name == 'jre' ? javaHome.parentFile : javaHome
+    File file = new File(javaHome, location)
+    if (file.exists()) {
+        ext.toolsLocation = file.absolutePath
+        break
+    }
+}
 // TODO use antlr plugin
 //apply plugin: 'antlr'
 
 allprojects {
     apply plugin: 'java'
+    apply plugin: 'idea'
 
     buildDir = 'target'
     sourceCompatibility = 1.6
@@ -76,6 +87,31 @@ subprojects {
     task sourceJar(type: Jar) {
         classifier = 'sources'
         from sourceSets.main.allSource
+    }
+
+    configurations {
+        compileOnly
+        testCompileOnly
+    }
+
+    sourceSets {
+        main {
+            compileClasspath += [configurations.compileOnly]
+        }
+        test {
+            compileClasspath += [configurations.testCompileOnly]
+        }
+    }
+
+    javadoc {
+        classpath += [configurations.compileOnly]
+    }
+
+    idea {
+        module {
+            scopes.PROVIDED.plus += [configurations.compileOnly]
+            scopes.PROVIDED.plus += [configurations.testCompileOnly]
+        }
     }
 }
 
